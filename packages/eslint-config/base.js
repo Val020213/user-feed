@@ -1,11 +1,8 @@
-import { createRequire } from "node:module"
-import babelParser from "@babel/eslint-parser"
 import js from "@eslint/js"
+import { plugin as shadcn } from "@shadcn/lint"
+import tsParser from "@typescript-eslint/parser"
 import eslintConfigPrettier from "eslint-config-prettier"
-import onlyWarn from "eslint-plugin-only-warn"
 import turboPlugin from "eslint-plugin-turbo"
-
-const require = createRequire(import.meta.url)
 
 /**
  * A shared ESLint configuration for the repository.
@@ -17,24 +14,21 @@ export const config = [
   eslintConfigPrettier,
   {
     languageOptions: {
-      parser: babelParser,
-      parserOptions: {
-        requireConfigFile: false,
-        babelOptions: {
-          presets: [require.resolve("@babel/preset-typescript")],
-        },
-      },
+      parser: tsParser,
+      parserOptions: { ecmaFeatures: { jsx: true } },
     },
     plugins: {
       turbo: turboPlugin,
+      shadcn,
     },
     rules: {
       "turbo/no-undeclared-env-vars": "warn",
     },
   },
   {
-    plugins: {
-      onlyWarn,
+    files: ["**/*.{ts,tsx,mts,cts}"],
+    rules: {
+      "no-undef": "off",
     },
   },
   {

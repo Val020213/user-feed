@@ -1,7 +1,6 @@
+import nextVitals from "eslint-config-next/core-web-vitals"
+import nextTs from "eslint-config-next/typescript"
 import { globalIgnores } from "eslint/config"
-import pluginNext from "@next/eslint-plugin-next"
-import pluginReactHooks from "eslint-plugin-react-hooks"
-import globals from "globals"
 
 import { config as baseConfig } from "./base.js"
 
@@ -12,6 +11,8 @@ import { config as baseConfig } from "./base.js"
  */
 export const nextJsConfig = [
   ...baseConfig,
+  ...nextVitals,
+  ...nextTs,
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
@@ -19,22 +20,4 @@ export const nextJsConfig = [
     "build/**",
     "next-env.d.ts",
   ]),
-  {
-    languageOptions: {
-      globals: {
-        ...globals.browser,
-        ...globals.serviceworker,
-      },
-    },
-  },
-  {
-    plugins: {
-      "@next/next": pluginNext,
-    },
-    rules: {
-      ...pluginNext.configs.recommended.rules,
-      ...pluginNext.configs["core-web-vitals"].rules,
-    },
-  },
-  pluginReactHooks.configs.flat.recommended,
 ]

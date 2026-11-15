@@ -1,0 +1,2 @@
+pnpm exec lint-staged
+pnpm exec turbo lint typecheck --output-logs=errors-only
