@@ -138,15 +138,15 @@ JSONPlaceholder runs json-server 0.x. Its guide documents only the basic routes,
 - KTD5. **The server keeps published posts in an in-memory store (`post-store.ts`).** `createPost` validates with the shared Zod schema, awaits `POST /posts`, then saves the post with the next id from 101 and returns `{ ok: true, post }`, or `{ ok: false, error }` with an optional `field`. It never throws, because thrown messages are stripped in production. `getUserPosts` serves the user's stored posts first, newest first and filtered by `q`, then pages into the API with `_start`/`_limit`, so every page holds exactly 4 posts across both sources, and the total is the sum. The store is shared by every visitor, lost on restart, and not shared between instances; the README says so.
 - KTD6. **Publishing flow: the server is the source of truth.** `useCreatePost` is a `useMutation` keyed `["create-post", userId]`. Its `onSuccess` returns `invalidateQueries(["posts", userId])`, so the mutation stays pending until the refetched feed contains the post, and there is no flicker or duplicate. The feed renders pending posts from `useMutationState` (status `pending`) above the server pages with a "Sending…" badge, and marks posts whose ids come from successful mutations with a "New" badge. No query cache is written by hand.
 - KTD7. **One data-access seam per feature, in a `"use server"` module named `server-actions.ts`.** `features/users/server-actions.ts` holds `getUsers` and `getUser` (each `"use cache"` inside). `features/posts/server-actions.ts` holds `getUserPosts` and `createPost`. Both return Zod-parsed data. The UI never builds JSONPlaceholder URLs. `lib/jsonplaceholder.ts` owns the base URL and one `request` helper that times out after 10 seconds and turns network failures, timeouts and non-2xx responses into `ApiError`. `POSTS_PAGE_SIZE = 4` and `USERS_PAGE_SIZE = 5` are named constants in the schemas.
-- KTD8. **Errors.** Route-level `error.tsx` uses `retry()`, which became stable in Next 16.3; `reset()` does not refetch Server Component data. Every error renders through one `ErrorState` component (alert plus optional "Try again"). In the feed, a failed first load replaces the feed (`isLoadingError`); any later failure (next page or background refresh) keeps the posts and shows the error at the end of the list, retrying the failed page or refetching. Auto-loading stops while the feed is in error. A failed publish shows `toast.error`; field errors go to the field with `setError`.
+- KTD8. **Errors.** Route-level `error.tsx` uses `retry()`, which became stable in Next 16.3; `reset()` does not refetch Server Component data. Every error renders through one `ErrorState` component (alert plus optional "Try again"). In the feed, a failed first load replaces the feed (`isLoadingError`); any later failure (next page or background refresh) keeps the posts and shows the error at the end of the list, retrying the failed page or refetching. Auto-loading stops while the feed is in error. A failed publish shows `toast.error`; field errors go to the field with `setError`. What no route handles lands in `app/error.tsx`, errors in the root layout in `app/global-error.tsx` (its own `<html>`, `<body>` and global styles), and unknown addresses in `app/not-found.tsx`. Every not-found and error page renders inside `StatusPage`, a full-height `<main>` that centers the message on the screen.
 - KTD9. **UI from shadcn (`base-luma`, Base UI), installed into `packages/ui` with the shadcn CLI by the unit that first uses each one:** alert, alert-dialog, avatar, badge, button, card, dialog, drawer, empty, field, input-group, pagination, skeleton, sonner, spinner, textarea (plus their dependencies). Toasts use the Sonner wrapper, kept neutral: only the status icon is colored (`text-success`, `text-destructive`), with a `--success` theme token. Forms use field components ported from ecommerce-base into `packages/ui`: `fields/` (`FieldFrame`, `InputField`, `TextareaField`, `SearchField`) and `rhf/` (`Form`, `RhfInput`, `RhfTextarea`). Fields read `control` from the `Form` context and take the values type as a generic (`RhfInput<CreatePostValues>`), which keeps field names type-checked. `SearchField` hides WebKit's own clear button. Never call `watch()`: the `react-hooks/incompatible-library` warning fails lint at max-warnings 0.
 - KTD10. **Tests: Vitest with jsdom, `@vitejs/plugin-react` and Testing Library, in `apps/web` only.**
   - `fetch` is stubbed per test with `vi.stubGlobal`. No MSW: one `fetch` call site (`request`) makes a stub enough.
   - Create-post tests run the real Server Actions and post store; only the network is faked. `createPost` is wrapped in a spy that calls through, to count calls. `resetPostStore()` runs before each test.
   - nuqs uses its testing adapter, with assertions on URL updates.
-  - `IntersectionObserver` is replaced by a fake class in `tests/support/intersection-observer.ts` that tests can trigger. `matchMedia` is stubbed per test for the dialog/drawer switch.
+  - `IntersectionObserver` is replaced by a fake class in `tests/support/intersection-observer.ts` that tests can trigger. `stubViewport(width)` stubs `innerWidth` and `matchMedia`, which `useIsMobile` and Sonner's `Toaster` read, and can fire a resize.
 - KTD11. **Page param:** a custom parser accepts only positive integers and falls back to 1, following the backoffice `positivePage` parser. An out-of-range page `redirect()`s to the last page once the total is known. Zero results render the empty state on page 1. The `[id]` segment is parsed the same way; anything else is `notFound()`.
-- KTD12. **Form dialogs.** `ResponsiveDialog` renders a Dialog at 768 px and wider and a Drawer below; the variant is fixed while open, so crossing the breakpoint does not remount the form. Its `disablePointerDismissal` prop keeps a form open on outside clicks. The form container owns its dialog: a close request (✕, Escape, swipe, Cancel) is ignored while submitting, opens `DiscardChangesDialog` when the form is dirty, and closes otherwise. `NewPostButton` gives the container a new `key` per opening, so each opening starts from the default values without `form.reset`. Container and form are split: `CreatePostFormContainer` holds `useForm`, the mutation, toasts and the dialog; `CreatePostForm` only renders fields and buttons, so an edit flow can reuse it.
+- KTD12. **Form dialogs.** `ResponsiveDialog` renders a Dialog at 768 px and wider and a Drawer below, chosen by `useIsMobile` (shadcn's `use-mobile` in `packages/ui/src/hooks`, rewritten with `useSyncExternalStore` as in ecommerce-base). Crossing the breakpoint while open swaps them and remounts the fields; the draft survives because `useForm` lives in the container above the dialog and React Hook Form keeps the values of unmounted fields. A CSS-only bottom sheet (one Dialog restyled with `max-md:`) was tried and rejected as less usable than the Drawer. Its `disablePointerDismissal` prop keeps a form open on outside clicks. The form container owns its dialog: a close request (✕, Escape, swipe, Cancel) is ignored while submitting, opens `DiscardChangesDialog` when the form is dirty, and closes otherwise. `NewPostButton` gives the container a new `key` per opening, so each opening starts from the default values without `form.reset`. Container and form are split: `CreatePostFormContainer` holds `useForm`, the mutation, toasts and the dialog; `CreatePostForm` only renders fields and buttons and reads the form from context (the container renders `Form` around it), so an edit flow can reuse it.
 - KTD13. **Infinite scroll.** `useInfiniteScroll` owns the `IntersectionObserver` (latest `fetchNextPage` via `useEffectEvent`, disconnect on unmount, no-op where unsupported). The "Load more" button is also the observed trigger (`rootMargin: 600px`), auto-loading only when a next page exists, nothing is fetching and the feed is not in error. When a pressed "Load more" loads the last page, focus moves to the end message so it is not lost with the removed button.
 - KTD14. **Navigation progress.** A module-level store counts pending link navigations: each `<Link>` that should drive the bar renders `NavigationPendingReporter`, which reports `useLinkStatus().pending`, and `NavigationProgress` shows a 6 px animated bar in the primary color while any is pending (U2). Adapted from ecommerce-base's backoffice. Searches and pagination do not drive it: a bar on every keystroke reads as noise, and the dimmed list (KTD1) is their loading state. `nextjs-toploader` was rejected: it starts on any `<a>` click (pagination included) and cannot follow a nuqs transition.
 - KTD15. **Lint:** the shared ESLint base config uses `@typescript-eslint/no-unused-vars` on TS files instead of the core rule, which misreads parameter names inside function types. No `eslint-disable` comments.
@@ -195,8 +195,11 @@ stateDiagram-v2
 
 ```text
 apps/web/
+  next.config.ts                     Cache Components, redirect / to /users
   app/
-    page.tsx                         redirect to /users
+    not-found.tsx                    unknown addresses
+    error.tsx                        errors no route handles
+    global-error.tsx                 errors in the root layout
     providers.tsx                    NuqsAdapter, NavigationProgress, QueryClientProvider, Toaster
     users/
       page.tsx                       list route
@@ -210,8 +213,8 @@ apps/web/
     responsive-dialog.tsx
     discard-changes-dialog.tsx
     navigation-progress.tsx
+    status-page.tsx                  centered frame for not-found and error pages
   hooks/
-    use-media-query.ts
     use-infinite-scroll.ts
   lib/
     jsonplaceholder.ts               base URL, request (10 s timeout), apiGet, apiPost, ApiError
@@ -264,7 +267,7 @@ Each unit is one commit, in this order. A unit brings in the dependencies, shadc
   - shadcn components (CLI): `alert`, `card`, `empty`, `field` (with `label`, `separator`), `input-group` (with `input`), `pagination`, `skeleton`. `InputGroupTextarea` is removed from `input-group`: the app never uses it, and it would pull in `textarea` before anything needs it.
   - `packages/ui/src/components/fields/`: `FieldFrame`, `InputField`, `SearchField` (KTD9), and the ESLint rule that `FieldFrame`'s function type needs (KTD15).
   - `lib/jsonplaceholder.ts` (`request` with the 10 s timeout, `ApiError`, `apiGet`), `lib/escape-regexp.ts`, `components/error-state.tsx` (KTD8).
-  - `app/providers.tsx` with `NuqsAdapter`, wrapped by `layout.tsx`; `app/page.tsx` redirects to `/users`.
+  - `app/providers.tsx` with `NuqsAdapter`, wrapped by `layout.tsx`; `next.config.ts` redirects `/` to `/users` (a page that only calls `redirect()` fails Next's development-time instant-navigation validation).
 - **Files:** `apps/web/features/users/schemas.ts`, `server-actions.ts` (`getUsers`), `search-params.ts`, `utils/initials.ts`, `components/users-transition.tsx`, `users-search.tsx`, `user-list.tsx`, `user-card.tsx`, `users-pagination.tsx`, `user-list-skeleton.tsx`, `apps/web/app/users/page.tsx`, `apps/web/app/users/error.tsx`, `apps/web/vitest.config.ts`, `apps/web/tests/setup.ts`, plus the files listed under Brings in.
 - **Approach:**
   1. `search-params.ts` defines `q` and `page` (KTD11), a server loader, and `usersHref` for pagination links.
@@ -293,10 +296,10 @@ Each unit is one commit, in this order. A unit brings in the dependencies, shadc
 - **Brings in:** `lib/navigation-progress.ts`, `components/navigation-progress.tsx` and the bar's animation in `packages/ui/src/styles/globals.css` (KTD14).
 - **Files:** `apps/web/features/users/server-actions.ts` (adds `getUser`), `utils/user-id.ts`, `components/user-header.tsx`, `apps/web/app/users/[id]/page.tsx`, `not-found.tsx`, `error.tsx`, `apps/web/app/providers.tsx` (adds `NavigationProgress`), `apps/web/tests/navigation-progress.test.tsx`, plus the files listed under Brings in. Reuses: `user-card.tsx`, `UserHeader`'s back link and `not-found.tsx` render `NavigationPendingReporter` inside their links.
 - **Approach:**
-  1. The page passes the `params` promise to `UserHeader` inside `<Suspense>`. `resolveUserId` parses the segment or calls `notFound()`; `UserHeader` calls `notFound()` for a missing user. A back link returns to `/users`.
+  1. The page passes the `params` promise to `UserHeader` inside `<Suspense>`. `resolveUserId` parses the segment or calls `notFound()`; `UserHeader` calls `notFound()` for a missing user. An "All users" ghost `Button` rendered as a `Link` returns to `/users`.
   2. The header shows initials, name, username, the catchphrase, and email (`mailto:`), phone (`tel:`) and website as links.
   3. The bar is fixed to the top of the viewport, 6 px high (`h-1.5`), with a primary-colored segment (`bg-primary`) sliding over a faint primary track (`bg-primary/25`). With `prefers-reduced-motion`, the segment fills the track and does not move.
-  4. `error.tsx` and `not-found.tsx` reuse `ErrorState` and `Empty`.
+  4. `error.tsx` and `not-found.tsx` reuse `ErrorState` and `Empty`, inside `StatusPage` (KTD8).
 - **Patterns to follow:** ecommerce-base backoffice `lib/navigation-progress`.
 - **Test scenarios:** The bar shows while a link navigation is pending and hides after (`useLinkStatus` mocked).
 - **Verification:** On the running app, clicking "All users" from a user page shows the bar until the list renders, and typing a search does not show it. `/users/999` and `/users/abc` show not-found.
@@ -339,14 +342,14 @@ Each unit is one commit, in this order. A unit brings in the dependencies, shadc
   - Dependencies: `react-hook-form` and `@hookform/resolvers` in `apps/web`, and `react-hook-form` and `sonner` in `packages/ui`.
   - shadcn components: `alert-dialog`, `badge`, `dialog`, `drawer`, `textarea` (for `TextareaField`), `sonner` (neutral toasts, colored icons, with the `--success` tokens in `globals.css`), and the `Toaster` in `providers.tsx`.
   - `packages/ui/src/components/fields/textarea-field.tsx` and `rhf/` (`Form`, `RhfInput`, `RhfTextarea`, field props).
-  - `components/responsive-dialog.tsx`, `components/discard-changes-dialog.tsx`, `hooks/use-media-query.ts` (KTD12), `apiPost` in `lib/jsonplaceholder.ts`, and `postsKeys.all` in `queries.ts` (the key the mutation invalidates; `feed` is built from it).
+  - `components/responsive-dialog.tsx`, `components/discard-changes-dialog.tsx`, `useIsMobile` via `shadcn add use-mobile` in `packages/ui` (KTD12), `apiPost` in `lib/jsonplaceholder.ts`, and `postsKeys.all` in `queries.ts` (the key the mutation invalidates; `feed` is built from it).
 - **Files:** `apps/web/features/posts/post-store.ts`, `schemas.ts` (create schema and result), `server-actions.ts` (`createPost`; `getUserPosts` serves stored posts first), `hooks/use-create-post.ts`, `hooks/use-posts-feed.ts` (pending rows, New ids), `components/new-post-button.tsx`, `create-post-form-container.tsx`, `create-post-form.tsx`, `posts-feed.tsx` (badges), `user-posts.tsx` (button in the heading row), `apps/web/tests/create-post-form.test.tsx`, `posts-server-actions.test.ts` (store and create cases), plus the files listed under Brings in.
 - **Approach:**
   1. The create schema trims title and body and requires both ("Title is required", "Body is required"), with caps of 120 and 2000 characters. The same schema runs in the resolver and in the action.
   2. `post-store.ts`, `createPost` and the merged `getUserPosts` follow KTD4 and KTD5.
   3. `useCreatePost` follows KTD6. `usePostsFeed` also returns `publishing` and `newPostIds`.
   4. `CreatePostFormContainer` follows KTD12: on a field error, `setError`; on any other error, `toast.error("We could not publish the post")` with the reason; on success, close and `toast.success("Post created successfully")`.
-  5. `CreatePostForm` renders `RhfInput`/`RhfTextarea`, Cancel, and Publish with a paper-plane icon after the label (a spinner while publishing). The `Form` fieldset disables everything while submitting.
+  5. The container renders `Form` (the create schema plus `userId` validated by one `createPostInputSchema` on the server); inside it `CreatePostForm` renders `RhfInput`/`RhfTextarea`, Cancel, and Publish with a paper-plane icon after the label (a spinner while publishing). The `Form` fieldset disables everything while submitting.
 - **Patterns to follow:** `/data/Personal/ecommerce-base/apps/backoffice/src/features/access-management/users/form/user-form.tsx` and `user-form-dialog.tsx`; ecommerce-base `packages/ui/src/components/rhf/`.
 - **Test scenarios** (real actions and store, `fetch` stubbed):
   - Stored posts come first, newest first, and pages continue into the API's posts (3 stored plus 5 from the API: page 1 is the 3 stored and API post 1, page 2 is API posts 2 to 5, total 8); they are filtered by `q` and belong only to their author.
@@ -357,7 +360,8 @@ Each unit is one commit, in this order. A unit brings in the dependencies, shadc
   - Covers AE5. The server filters new posts with the search, and clearing it shows them again.
   - A rejected POST keeps the draft, removes the pending row, and shows the toast with the reason.
   - Clicking Publish twice sends one post.
-  - On a narrow screen the form opens in a drawer; crossing the breakpoint while open keeps the draft.
+  - On a narrow screen the form opens in a drawer; when the dialog turns into a drawer while open, the draft stays.
+  - `createPost` rejects an unknown user without calling the API.
   - Cancel closes at once when nothing was written.
   - Covers AE7. A dirty form asks before discarding; Keep editing keeps the draft; Discard closes, and the next opening is empty.
   - The dialog stays open while publishing, so a failure is never missed.
@@ -379,7 +383,7 @@ Each unit is one commit, in this order. A unit brings in the dependencies, shadc
 
 - **Goal:** R16 is met with content an evaluator can act on.
 - **Requirements:** R16.
-- **Dependencies:** U1 to U5.
+- **Dependencies:** U1 to U5 and U7.
 - **Files:** `README.md` (replaces the shadcn template text).
 - **Approach:** Sections:
   - How to run: Node version from `.nvmrc`, pnpm, dev, test and build commands.
@@ -391,6 +395,18 @@ Each unit is one commit, in this order. A unit brings in the dependencies, shadc
   - Time spent.
 - **Test scenarios:** Test expectation: none. This is documentation.
 - **Verification:** A fresh clone following only the README runs the app and the tests.
+
+### U7. App-wide not-found and error pages
+
+Built after U5, before the README.
+
+- **Goal:** Addresses and errors no route handles get a page in the app's style, and every not-found and error page is centered on the screen (KTD8).
+- **Requirements:** R6, R12.
+- **Dependencies:** U2.
+- **Files:** `apps/web/app/not-found.tsx`, `error.tsx`, `global-error.tsx`, `apps/web/components/status-page.tsx`, `apps/web/next.config.ts` (the `/` redirect, replacing `app/page.tsx`), the existing `users/error.tsx`, `users/[id]/error.tsx` and `users/[id]/not-found.tsx` (now inside `StatusPage`), `apps/web/tests/app-error-pages.test.tsx`.
+- **Approach:** `Empty` gets `flex-none` on the not-found pages so its border wraps the content instead of filling the screen.
+- **Test scenarios:** The not-found page links to `/users`; the error page logs the error and calls `retry`.
+- **Verification:** On `pnpm build && pnpm start`, `/` answers 307 to `/users`, `/nope` answers 404 with "Page not found", and the not-found box sits at the vertical center at desktop and phone widths.
 
 ---
 
