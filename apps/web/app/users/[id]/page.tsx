@@ -1,5 +1,7 @@
 import { Suspense } from "react"
 
+import { PostsFeedSkeleton } from "@/features/posts/components/posts-feed-skeleton"
+import { UserPosts } from "@/features/posts/components/user-posts"
 import {
   BackToUsers,
   UserHeader,
@@ -16,6 +18,9 @@ export default function UserPostsPage({
       <BackToUsers />
       <Suspense fallback={<UserHeaderSkeleton />}>
         <UserHeader params={params} />
+      </Suspense>
+      <Suspense fallback={<PostsFeedSkeleton />}>
+        <UserPosts params={params} />
       </Suspense>
     </main>
   )
