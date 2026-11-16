@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { act, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { withNuqsTestingAdapter } from "nuqs/adapters/testing"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { PostsFeed } from "@/features/posts/components/posts-feed"
@@ -11,7 +10,7 @@ import {
   FakeIntersectionObserver,
   stubIntersectionObserver,
 } from "./support/intersection-observer"
-import { setUrlSearchParams } from "./support/search-params"
+import { withTestUrl } from "./support/search-params"
 
 vi.mock("next/navigation", () => import("./support/search-params"))
 
@@ -52,12 +51,7 @@ function renderFeed(searchParams = "") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
-  setUrlSearchParams(searchParams)
-  const Nuqs = withNuqsTestingAdapter({
-    searchParams,
-    hasMemory: true,
-    onUrlUpdate: (event) => setUrlSearchParams(event.searchParams),
-  })
+  const Nuqs = withTestUrl(searchParams)
   render(
     <QueryClientProvider client={queryClient}>
       <Nuqs>

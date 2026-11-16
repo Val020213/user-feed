@@ -2,6 +2,7 @@
 
 import { FileTextIcon, SearchXIcon } from "lucide-react"
 
+import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
   Empty,
@@ -20,9 +21,10 @@ import { PostCard } from "./post-card"
 import { PostsFeedSkeleton } from "./posts-feed-skeleton"
 
 export function PostsFeed({ userId }: { userId: number }) {
-  const { feed, search, posts } = usePostsFeed(userId)
+  const { feed, search, posts, publishing, newPostIds } = usePostsFeed(userId)
   const { triggerRef, loadMore, endRef } =
     useInfiniteScroll<HTMLButtonElement>(feed)
+  const isPublishing = publishing.length > 0
 
   const error = feed.isError ? (
     <ErrorState
@@ -69,11 +71,11 @@ export function PostsFeed({ userId }: { userId: number }) {
     )
   }
 
-  if (feed.isPending) return <PostsFeedSkeleton />
+  if (feed.isPending && !isPublishing) return <PostsFeedSkeleton />
 
-  if (feed.isLoadingError) return error
+  if (feed.isLoadingError && !isPublishing) return error
 
-  if (feed.isSuccess && posts.length === 0) {
+  if (feed.isSuccess && posts.length === 0 && !isPublishing) {
     return (
       <Empty className="border">
         <EmptyHeader>
@@ -97,9 +99,24 @@ export function PostsFeed({ userId }: { userId: number }) {
       className="flex flex-col gap-3 transition-opacity aria-busy:opacity-60"
     >
       <ul className="flex flex-col gap-3">
+        {publishing.map((post) => (
+          <li key={post.key}>
+            <PostCard title={post.title} body={post.body}>
+              <Badge variant="secondary">
+                <Spinner data-icon="inline-start" /> Sending…
+              </Badge>
+            </PostCard>
+          </li>
+        ))}
         {posts.map((post) => (
           <li key={post.id}>
-            <PostCard title={post.title} body={post.body} />
+            <PostCard title={post.title} body={post.body}>
+              {newPostIds.includes(post.id) ? (
+                <Badge className="bg-success text-success-foreground">
+                  New
+                </Badge>
+              ) : null}
+            </PostCard>
           </li>
         ))}
       </ul>

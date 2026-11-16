@@ -3,6 +3,8 @@
 import { QueryClientProvider } from "@tanstack/react-query"
 import { NuqsAdapter } from "nuqs/adapters/next/app"
 
+import { Toaster } from "@workspace/ui/components/sonner"
+
 import { NavigationProgress } from "@/components/navigation-progress"
 import { getQueryClient } from "@/lib/query-client"
 
@@ -12,7 +14,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <NuqsAdapter>
       <NavigationProgress />
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        {children}
+        <Toaster position="bottom-right" />
+      </QueryClientProvider>
     </NuqsAdapter>
   )
 }

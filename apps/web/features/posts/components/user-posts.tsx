@@ -1,5 +1,6 @@
 import { resolveUserId } from "@/features/users/utils/user-id"
 
+import { NewPostButton } from "./new-post-button"
 import { PostsFeed } from "./posts-feed"
 import { PostsSearch } from "./posts-search"
 
@@ -12,9 +13,12 @@ export async function UserPosts({
 
   return (
     <section aria-labelledby="posts-heading" className="flex flex-col gap-4">
-      <h2 id="posts-heading" className="font-heading text-lg font-medium">
-        Posts
-      </h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="posts-heading" className="font-heading text-lg font-medium">
+          Posts
+        </h2>
+        <NewPostButton userId={userId} />
+      </div>
       <PostsSearch />
       <PostsFeed userId={userId} />
     </section>

@@ -1,3 +1,4 @@
+import { withNuqsTestingAdapter } from "nuqs/adapters/testing"
 import { useSyncExternalStore } from "react"
 
 /**
@@ -7,7 +8,7 @@ import { useSyncExternalStore } from "react"
 let params = new URLSearchParams()
 const listeners = new Set<() => void>()
 
-export function setUrlSearchParams(next: string | URLSearchParams) {
+function setUrlSearchParams(next: string | URLSearchParams) {
   params = new URLSearchParams(next)
   for (const listener of listeners) listener()
 }
@@ -21,4 +22,14 @@ function subscribe(listener: () => void) {
 
 export function useSearchParams() {
   return useSyncExternalStore(subscribe, () => params)
+}
+
+/** A nuqs testing adapter that starts at `searchParams` and keeps the stand-in URL in step. */
+export function withTestUrl(searchParams = "") {
+  setUrlSearchParams(searchParams)
+  return withNuqsTestingAdapter({
+    searchParams,
+    hasMemory: true,
+    onUrlUpdate: (event) => setUrlSearchParams(event.searchParams),
+  })
 }

@@ -3,7 +3,9 @@ import { infiniteQueryOptions } from "@tanstack/react-query"
 import { getUserPosts } from "./server-actions"
 
 export const postsKeys = {
-  feed: (userId: number, q: string) => ["posts", userId, { q }] as const,
+  all: (userId: number) => ["posts", userId] as const,
+  feed: (userId: number, q: string) =>
+    [...postsKeys.all(userId), { q }] as const,
 }
 
 export function postsFeedOptions(userId: number, q: string) {

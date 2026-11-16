@@ -72,3 +72,12 @@ export async function apiGet<Schema extends z.ZodType>(
     total: totalHeader === null ? null : Number(totalHeader),
   }
 }
+
+/** Sends a JSON body to JSONPlaceholder. It echoes the body but stores nothing. */
+export async function apiPost(path: string, body: unknown): Promise<void> {
+  await request(buildApiUrl(path), {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=UTF-8" },
+    body: JSON.stringify(body),
+  })
+}
