@@ -12,7 +12,7 @@ import { Card, CardContent } from "@workspace/ui/components/card"
 import { NavigationPendingReporter } from "@/lib/navigation-progress"
 
 import type { User } from "../schemas"
-import { initials } from "../utils/initials"
+import { UserAvatar } from "./user-avatar"
 
 /**
  * One full-width row per user: who they are on the left, how to reach them in
@@ -34,12 +34,11 @@ export function UserCard({ user }: { user: User }) {
       <Card className="transition-colors group-hover:bg-muted/50">
         <CardContent className="grid gap-4 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_auto] md:items-center md:gap-6">
           <div className="flex min-w-0 items-center gap-3">
-            <span
-              aria-hidden="true"
-              className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted font-medium"
-            >
-              {initials(user.name)}
-            </span>
+            <UserAvatar
+              name={user.name}
+              email={user.email}
+              className="size-12 text-base"
+            />
             <div className="flex min-w-0 flex-col gap-0.5">
               <h2 className="truncate font-heading font-medium">{user.name}</h2>
               <p className="truncate text-sm text-muted-foreground">

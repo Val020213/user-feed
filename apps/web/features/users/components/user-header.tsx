@@ -14,8 +14,8 @@ import { Skeleton } from "@workspace/ui/components/skeleton"
 import { NavigationPendingReporter } from "@/lib/navigation-progress"
 
 import { getUser } from "../server-actions"
-import { initials } from "../utils/initials"
 import { resolveUserId } from "../utils/user-id"
+import { UserAvatar } from "./user-avatar"
 
 function telHref(phone: string) {
   // "1-770-736-8031 x56442": dial the number, drop the extension.
@@ -66,12 +66,11 @@ export async function UserHeader({
   return (
     <header className="flex flex-col gap-5">
       <div className="flex items-center gap-4">
-        <span
-          aria-hidden="true"
-          className="flex size-14 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-medium"
-        >
-          {initials(user.name)}
-        </span>
+        <UserAvatar
+          name={user.name}
+          email={user.email}
+          className="size-14 text-lg"
+        />
         <div className="flex min-w-0 flex-col gap-0.5">
           <h1 className="truncate font-heading text-2xl font-semibold">
             {user.name}
