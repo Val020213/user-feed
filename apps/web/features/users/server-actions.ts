@@ -4,9 +4,14 @@ import { cacheLife } from "next/cache"
 import { z } from "zod"
 
 import { escapeRegExp } from "@/lib/escape-regexp"
-import { apiGet } from "@/lib/jsonplaceholder"
+import { ApiError, apiGet } from "@/lib/jsonplaceholder"
 
-import { USERS_PAGE_SIZE, userSchema, type UsersPage } from "./schemas"
+import {
+  USERS_PAGE_SIZE,
+  userSchema,
+  type User,
+  type UsersPage,
+} from "./schemas"
 
 /** Lists users whose name contains `name`, case-insensitively. */
 export async function getUsers({
@@ -32,5 +37,19 @@ export async function getUsers({
     users: data,
     total: count,
     totalPages: Math.ceil(count / USERS_PAGE_SIZE),
+  }
+}
+
+/** Returns the user, or null when it does not exist. */
+export async function getUser(id: number): Promise<User | null> {
+  "use cache"
+  cacheLife("hours")
+
+  try {
+    const { data } = await apiGet(`/users/${id}`, userSchema)
+    return data
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null
+    throw error
   }
 }

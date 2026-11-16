@@ -9,6 +9,8 @@ import Link from "next/link"
 
 import { Card, CardContent } from "@workspace/ui/components/card"
 
+import { NavigationPendingReporter } from "@/lib/navigation-progress"
+
 import type { User } from "../schemas"
 import { initials } from "../utils/initials"
 
@@ -67,6 +69,7 @@ export function UserCard({ user }: { user: User }) {
           />
         </CardContent>
       </Card>
+      <NavigationPendingReporter />
     </Link>
   )
 }

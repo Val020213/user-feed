@@ -10,8 +10,17 @@ const user: User = {
   username: "Samantha",
   email: "Nathan@yesenia.net",
   phone: "1-463-123-4447",
-  address: { city: "McKenziehaven" },
-  company: { name: "Romaguera-Jacobson" },
+  website: "ramiro.info",
+  address: {
+    street: "Douglas Extension",
+    suite: "Suite 847",
+    city: "McKenziehaven",
+    zipcode: "59590-4157",
+  },
+  company: {
+    name: "Romaguera-Jacobson",
+    catchPhrase: "Face to face bifurcated interface",
+  },
 }
 
 describe("UserCard", () => {

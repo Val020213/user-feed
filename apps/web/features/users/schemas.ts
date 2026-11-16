@@ -6,8 +6,14 @@ export const userSchema = z.object({
   username: z.string(),
   email: z.string(),
   phone: z.string(),
-  address: z.object({ city: z.string() }),
-  company: z.object({ name: z.string() }),
+  website: z.string(),
+  address: z.object({
+    street: z.string(),
+    suite: z.string(),
+    city: z.string(),
+    zipcode: z.string(),
+  }),
+  company: z.object({ name: z.string(), catchPhrase: z.string() }),
 })
 
 export type User = z.infer<typeof userSchema>
