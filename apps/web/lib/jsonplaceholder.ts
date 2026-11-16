@@ -25,15 +25,27 @@ function buildApiUrl(path: string, query: Record<string, QueryValue> = {}) {
 
 const TIMEOUT_MS = 10_000
 
-/** Sends a request and turns network failures, timeouts and non-2xx into ApiError. */
+/**
+ * Sends a request and turns network failures, timeouts and non-2xx into
+ * ApiError. A read that got no answer is sent once more; a write is not,
+ * since it may have reached the server.
+ */
 async function request(url: URL, init?: RequestInit): Promise<Response> {
-  let response: Response
-  try {
-    response = await fetch(url, {
-      ...init,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    })
-  } catch (error) {
+  const attempts = init?.method === undefined ? 3 : 1 //Todo: use exponencial for limit rate
+  let response: Response | undefined
+  let error: unknown
+  for (let attempt = 0; attempt < attempts && !response; attempt++) {
+    try {
+      response = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+    } catch (cause) {
+      error = cause
+    }
+  }
+
+  if (!response) {
     throw new ApiError(
       error instanceof DOMException && error.name === "TimeoutError"
         ? "The server took too long to answer. Try again."

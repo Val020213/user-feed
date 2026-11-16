@@ -36,7 +36,7 @@ export function CreatePostForm({ onCancel }: { onCancel?: () => void }) {
         <Button type="submit">
           {isSubmitting ? (
             <>
-              Publishing… <Spinner data-icon="inline-end" />
+              Publishing <Spinner data-icon="inline-end" />
             </>
           ) : (
             <>

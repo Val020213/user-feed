@@ -1,0 +1,8 @@
+**/node_modules
+**/.next
+**/.turbo
+.git
+_local_context
+.claude
+.agents
+.vscode

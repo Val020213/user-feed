@@ -94,13 +94,28 @@ describe("getUserPosts", () => {
     expect(url.searchParams.has("q")).toBe(false)
   })
 
-  it("explains a request that timed out", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        throw new DOMException("The operation timed out.", "TimeoutError")
-      })
-    )
+  it("tries a read once more when the first attempt times out", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(
+        new DOMException("The operation timed out.", "TimeoutError")
+      )
+      .mockResolvedValueOnce(
+        new Response("[]", { headers: { "X-Total-Count": "0" } })
+      )
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await getUserPosts({ userId: 1, q: "", page: 1 })
+
+    expect(result.ok).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it("explains a read that timed out twice", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new DOMException("The operation timed out.", "TimeoutError")
+    })
+    vi.stubGlobal("fetch", fetchMock)
 
     const result = await getUserPosts({ userId: 1, q: "", page: 1 })
 
@@ -108,6 +123,7 @@ describe("getUserPosts", () => {
       ok: false,
       error: { message: "The server took too long to answer. Try again." },
     })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it("returns the failure instead of throwing when the API fails", async () => {
@@ -219,5 +235,17 @@ describe("createPost", () => {
       ok: false,
       error: { message: "Request failed with status 503." },
     })
+  })
+
+  it("does not send a post twice when the API does not answer", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new DOMException("The operation timed out.", "TimeoutError")
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await createPost({ userId: 1, title: "A", body: "B" })
+
+    expect(result.ok).toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
