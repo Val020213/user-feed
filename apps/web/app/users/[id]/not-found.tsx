@@ -11,12 +11,13 @@ import {
   EmptyTitle,
 } from "@workspace/ui/components/empty"
 
+import { StatusPage } from "@/components/status-page"
 import { NavigationPendingReporter } from "@/lib/navigation-progress"
 
 export default function UserNotFound() {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col px-4 py-10">
-      <Empty className="border">
+    <StatusPage>
+      <Empty className="flex-none border">
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <UserXIcon />
@@ -31,6 +32,6 @@ export default function UserNotFound() {
           </Button>
         </EmptyContent>
       </Empty>
-    </main>
+    </StatusPage>
   )
 }

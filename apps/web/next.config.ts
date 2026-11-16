@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   reactCompiler: true,
   transpilePackages: ["@workspace/ui"],
+  redirects() {
+    return [{ source: "/", destination: "/users", permanent: false }]
+  },
 }
 
 export default nextConfig

@@ -9,6 +9,7 @@ import {
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
+import { Button } from "@workspace/ui/components/button"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 
 import { NavigationPendingReporter } from "@/lib/navigation-progress"
@@ -125,12 +126,16 @@ export function UserHeaderSkeleton() {
 
 export function BackToUsers() {
   return (
-    <Link
-      href="/users"
-      className="inline-flex items-center gap-1.5 self-start text-sm text-muted-foreground hover:text-foreground"
+    <Button
+      variant="ghost"
+      size="sm"
+      className="self-start text-muted-foreground"
+      nativeButton={false}
+      render={<Link href="/users" />}
     >
-      <ArrowLeftIcon className="size-4" aria-hidden="true" /> All users
+      <ArrowLeftIcon data-icon="inline-start" aria-hidden="true" />
+      All users
       <NavigationPendingReporter />
-    </Link>
+    </Button>
   )
 }
