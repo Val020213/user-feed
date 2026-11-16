@@ -132,7 +132,7 @@ JSONPlaceholder runs json-server 0.x. Its guide documents only the basic routes,
 ### Key Technical Decisions
 
 - KTD1. **Users list: Server Component reading nuqs-parsed search params, fetching through `"use cache"` functions keyed by `(name, page)`.** The search box and the pagination share one transition (`UsersTransitionProvider`), so the list dims (`aria-busy`) while the server renders. The search writes the URL with `shallow: false`, `limitUrlUpdates: debounce(300)` and that transition; clearing applies at once (session-settled, user-directed: chosen over client fetching for the list, for shareable URL state and server rendering). Pattern: `/data/Personal/ecommerce-base/apps/backoffice/src/features/access-management/users/search-params.ts` (`createLoader`, custom positive-page parser, serializer). Under Cache Components, `searchParams` and `params` are passed down as promises and resolved inside components wrapped in `<Suspense>`; parsed values pass as arguments to the cached function, as in `/data/Personal/archived/nextjs-references/next-books/app/page.tsx`. Use `cacheLife("hours")`: the data never changes, and a past-revalidate entry blocks dynamic renders. Every component that calls a nuqs hook sits inside `<Suspense>`, or `pnpm build` fails.
-- KTD2. **Posts feed: `useInfiniteQuery` in the browser, calling the `getUserPosts` Server Action.** The query key is `["posts", userId, { q }]` with the debounced `q`, the page param is the page number, and `getNextPageParam` reads `nextPage` from the action's result. `placeholderData: keepPreviousData` dims the old rows during a new search instead of flashing the skeleton. Only the user header is server-rendered. Server prefetch plus `HydrationBoundary` is not used: under Cache Components it needs the custom hydration stamp from `next16-team-chat/lib/dehydrate.ts`, which costs more than it gains here. Trade-off: reads queue behind a publish (see Scope Boundaries).
+- KTD2. **Posts feed: `useInfiniteQuery` in the browser, calling the `getUserPosts` Server Action.** The query key is `["posts", userId, { q }]` with `q` read from the URL through Next's `useSearchParams()`: `PostsSearch` writes it with nuqs `limitUrlUpdates: debounce(300)`, so the URL, unlike the nuqs state, changes once per pause. Clearing applies at once. The page param is the page number, and `getNextPageParam` reads `nextPage` from the action's result. `placeholderData: keepPreviousData` dims the old rows during a new search instead of flashing the skeleton. Only the user header is server-rendered. Server prefetch plus `HydrationBoundary` is not used: under Cache Components it needs the custom hydration stamp from `next16-team-chat/lib/dehydrate.ts`, which costs more than it gains here. Trade-off: reads queue behind a publish (see Scope Boundaries).
 - KTD3. **User search uses `name_like` with the input regex-escaped.** One pure `escapeRegExp` helper is unit-tested (session-settled, user-approved: chosen over `q`, which matches email, company and id and breaks "search by name"; see AE1 and AE2).
 - KTD4. **Post search uses `q` for every post, with its id false-positives documented in the README** (session-settled, user-directed: chosen over `title_like`, because it covers title and body and needs no escaping). The post store mirrors json-server's `q`: a case-insensitive substring match on any field, ids included.
 - KTD5. **The server keeps published posts in an in-memory store (`post-store.ts`).** `createPost` validates with the shared Zod schema, awaits `POST /posts`, then saves the post with the next id from 101 and returns `{ ok: true, post }`, or `{ ok: false, error }` with an optional `field`. It never throws, because thrown messages are stripped in production. `getUserPosts` serves the user's stored posts first, newest first and filtered by `q`, then pages into the API with `_start`/`_limit`, so every page holds exactly 4 posts across both sources, and the total is the sum. The store is shared by every visitor, lost on restart, and not shared between instances; the README says so.
@@ -147,8 +147,8 @@ JSONPlaceholder runs json-server 0.x. Its guide documents only the basic routes,
   - `IntersectionObserver` is replaced by a fake class in `tests/support/intersection-observer.ts` that tests can trigger. `matchMedia` is stubbed per test for the dialog/drawer switch.
 - KTD11. **Page param:** a custom parser accepts only positive integers and falls back to 1, following the backoffice `positivePage` parser. An out-of-range page `redirect()`s to the last page once the total is known. Zero results render the empty state on page 1. The `[id]` segment is parsed the same way; anything else is `notFound()`.
 - KTD12. **Form dialogs.** `ResponsiveDialog` renders a Dialog at 768 px and wider and a Drawer below; the variant is fixed while open, so crossing the breakpoint does not remount the form. Its `disablePointerDismissal` prop keeps a form open on outside clicks. The form container owns its dialog: a close request (✕, Escape, swipe, Cancel) is ignored while submitting, opens `DiscardChangesDialog` when the form is dirty, and closes otherwise. `NewPostButton` gives the container a new `key` per opening, so each opening starts from the default values without `form.reset`. Container and form are split: `CreatePostFormContainer` holds `useForm`, the mutation, toasts and the dialog; `CreatePostForm` only renders fields and buttons, so an edit flow can reuse it.
-- KTD13. **Infinite scroll.** `useOnVisible` wraps `IntersectionObserver` (latest callback via `useEffectEvent`, disconnect on unmount, no-op where unsupported). `useInfiniteScroll` builds on it: the "Load more" button is also the observed trigger (`rootMargin: 600px`), auto-loading only when a next page exists, nothing is fetching and the feed is not in error. When a pressed "Load more" loads the last page, focus moves to the end message so it is not lost with the removed button.
-- KTD14. **Navigation progress.** `nextjs-toploader` draws the top bar for link navigation only. It starts on a link click and ends when the App Router writes the new URL, which happens once the page renders (U2). Typing a search does not show it, since a bar on every keystroke reads as noise; the dimmed list (KTD1) is the search's loading state. Pagination links are real `<a>` elements, so a page click shows the bar too.
+- KTD13. **Infinite scroll.** `useInfiniteScroll` owns the `IntersectionObserver` (latest `fetchNextPage` via `useEffectEvent`, disconnect on unmount, no-op where unsupported). The "Load more" button is also the observed trigger (`rootMargin: 600px`), auto-loading only when a next page exists, nothing is fetching and the feed is not in error. When a pressed "Load more" loads the last page, focus moves to the end message so it is not lost with the removed button.
+- KTD14. **Navigation progress.** A module-level store counts pending link navigations: each `<Link>` that should drive the bar renders `NavigationPendingReporter`, which reports `useLinkStatus().pending`, and `NavigationProgress` shows a 6 px animated bar in the primary color while any is pending (U2). Adapted from ecommerce-base's backoffice. Searches and pagination do not drive it: a bar on every keystroke reads as noise, and the dimmed list (KTD1) is their loading state. `nextjs-toploader` was rejected: it starts on any `<a>` click (pagination included) and cannot follow a nuqs transition.
 - KTD15. **Lint:** the shared ESLint base config uses `@typescript-eslint/no-unused-vars` on TS files instead of the core rule, which misreads parameter names inside function types. No `eslint-disable` comments.
 
 ### High-Level Technical Design
@@ -165,7 +165,7 @@ flowchart TB
   end
   subgraph Posts["/users/[id] (client feed)"]
     HD[UserHeader - RSC, getUser or notFound]
-    PS[PostsSearch - nuqs shallow:true] -->|debounced q| FQ[useInfiniteQuery posts,id,q]
+    PS[PostsSearch - nuqs debounce 300] -->|URL ?q| FQ[useInfiniteQuery posts,id,q]
     FQ -->|Server Action| GP[getUserPosts]
     GP --> ST[(post store, in memory)]
     GP -->|_start/_limit, q| JP[(JSONPlaceholder)]
@@ -197,7 +197,7 @@ stateDiagram-v2
 apps/web/
   app/
     page.tsx                         redirect to /users
-    providers.tsx                    NuqsAdapter, NextTopLoader, QueryClientProvider, Toaster
+    providers.tsx                    NuqsAdapter, NavigationProgress, QueryClientProvider, Toaster
     users/
       page.tsx                       list route
       error.tsx                      ErrorState + retry()
@@ -209,15 +209,15 @@ apps/web/
     error-state.tsx
     responsive-dialog.tsx
     discard-changes-dialog.tsx
+    navigation-progress.tsx
   hooks/
-    use-debounced-value.ts
     use-media-query.ts
-    use-on-visible.ts
     use-infinite-scroll.ts
   lib/
     jsonplaceholder.ts               base URL, request (10 s timeout), apiGet, apiPost, ApiError
     escape-regexp.ts
     query-client.ts
+    navigation-progress.ts           pending-links store, reporter
   features/
     users/
       server-actions.ts              getUsers, getUser ("use cache")
@@ -290,16 +290,16 @@ Each unit is one commit, in this order. A unit brings in the dependencies, shadc
 - **Goal:** `/users/[id]` shows the user header (R6), and the top progress bar runs on link navigation (R13).
 - **Requirements:** R6, R13.
 - **Dependencies:** U1.
-- **Brings in:** `nextjs-toploader` (KTD14).
-- **Files:** `apps/web/features/users/server-actions.ts` (adds `getUser`), `utils/user-id.ts`, `components/user-header.tsx`, `apps/web/app/users/[id]/page.tsx`, `not-found.tsx`, `error.tsx`, `apps/web/app/providers.tsx` (adds `NextTopLoader`).
+- **Brings in:** `lib/navigation-progress.ts`, `components/navigation-progress.tsx` and the bar's animation in `packages/ui/src/styles/globals.css` (KTD14).
+- **Files:** `apps/web/features/users/server-actions.ts` (adds `getUser`), `utils/user-id.ts`, `components/user-header.tsx`, `apps/web/app/users/[id]/page.tsx`, `not-found.tsx`, `error.tsx`, `apps/web/app/providers.tsx` (adds `NavigationProgress`), `apps/web/tests/navigation-progress.test.tsx`, plus the files listed under Brings in. Reuses: `user-card.tsx`, `UserHeader`'s back link and `not-found.tsx` render `NavigationPendingReporter` inside their links.
 - **Approach:**
   1. The page passes the `params` promise to `UserHeader` inside `<Suspense>`. `resolveUserId` parses the segment or calls `notFound()`; `UserHeader` calls `notFound()` for a missing user. A back link returns to `/users`.
   2. The header shows initials, name, username, the catchphrase, and email (`mailto:`), phone (`tel:`) and website as links.
-  3. The bar is 6 px high in the primary color (`color="var(--primary)"`, `height={6}`, no spinner).
+  3. The bar is fixed to the top of the viewport, 6 px high (`h-1.5`), with a primary-colored segment (`bg-primary`) sliding over a faint primary track (`bg-primary/25`). With `prefers-reduced-motion`, the segment fills the track and does not move.
   4. `error.tsx` and `not-found.tsx` reuse `ErrorState` and `Empty`.
-- **Patterns to follow:** bd-contratacion `apps/web/src/app/[locale]/layout.tsx` (`NextTopLoader`).
-- **Test scenarios:** None new: the bar is library code; the browser check below covers it.
-- **Verification:** On the running app, clicking a user card shows the bar until the page renders, and typing a search does not show it. `/users/999` and `/users/abc` show not-found.
+- **Patterns to follow:** ecommerce-base backoffice `lib/navigation-progress`.
+- **Test scenarios:** The bar shows while a link navigation is pending and hides after (`useLinkStatus` mocked).
+- **Verification:** On the running app, clicking "All users" from a user page shows the bar until the list renders, and typing a search does not show it. `/users/999` and `/users/abc` show not-found.
 
 ### U3. Posts feed (brief point 2, part 1)
 
@@ -309,17 +309,18 @@ Each unit is one commit, in this order. A unit brings in the dependencies, shadc
 - **Brings in:**
   - Dependency: `@tanstack/react-query`, with `QueryClientProvider` in `providers.tsx` and `lib/query-client.ts` (one browser client, 60 s `staleTime`, no refetch on window focus).
   - shadcn component: `spinner`.
-  - Hooks: `use-debounced-value.ts`, `use-on-visible.ts`, `use-infinite-scroll.ts` (KTD13), and `tests/support/intersection-observer.ts`.
-- **Files:** `apps/web/features/posts/schemas.ts` (post, `POSTS_PAGE_SIZE`, page and result types), `server-actions.ts` (`getUserPosts`), `search-params.ts`, `queries.ts`, `hooks/use-posts-feed.ts`, `components/user-posts.tsx`, `posts-search.tsx`, `posts-feed.tsx`, `post-card.tsx`, `posts-feed-skeleton.tsx`, `apps/web/app/users/[id]/page.tsx` (adds `UserPosts`), `apps/web/tests/posts-feed.test.tsx`, `use-on-visible.test.tsx`, `posts-server-actions.test.ts`, plus the files listed under Brings in. Reuses: `SearchField`, `ErrorState`, `Empty`, `Skeleton`.
+  - Hook: `use-infinite-scroll.ts` (KTD13), with `tests/support/intersection-observer.ts`, and `tests/support/search-params.ts` (a stand-in URL the nuqs testing adapter writes and the `next/navigation` mock reads).
+- **Files:** `apps/web/features/posts/schemas.ts` (post, `POSTS_PAGE_SIZE`, page and result types), `server-actions.ts` (`getUserPosts`), `search-params.ts`, `queries.ts`, `hooks/use-posts-feed.ts`, `components/user-posts.tsx`, `posts-search.tsx`, `posts-feed.tsx`, `post-card.tsx`, `posts-feed-skeleton.tsx`, `apps/web/app/users/[id]/page.tsx` (adds `UserPosts`), `apps/web/tests/posts-feed.test.tsx`, `use-infinite-scroll.test.tsx`, `posts-server-actions.test.ts`, plus the files listed under Brings in. Reuses: `SearchField`, `ErrorState`, `Empty`, `Skeleton`.
 - **Approach:**
   1. `getUserPosts` pages the API with `_start`/`_limit` and `q` (KTD4, KTD7); the post store arrives in U4.
   2. `UserPosts` renders the "Posts" heading, the search and the feed.
-  3. `usePostsFeed(userId)` reads `q`, debounces it 300 ms, runs the infinite query (KTD2), and returns `{ feed, search, posts }`.
+  3. `PostsSearch` writes `q` with nuqs, debounced 300 ms while typing. `usePostsFeed(userId)` reads `q` from the URL, runs the infinite query (KTD2), and returns `{ feed, search, posts }`.
   4. `PostsFeed` only renders: skeleton on first load, `ErrorState` per KTD8, `Empty` ("No posts match" or "No posts yet"), the posts, and a footer from early returns: the "Load more" trigger (KTD13) or "You've reached the end" in a polite live region.
 - **Patterns to follow:** `/data/Personal/archived/nextjs-references/next16-social-media/components/ui/load-more.tsx` for the button's pending label.
 - **Test scenarios:**
   - `getUserPosts` gives `nextPage: 2` for a full first page of 10, and no next page on the last page; it sends `userId`, `q`, `_start` and `_limit=4`, and omits `q` when blank; a 500 resolves to `{ ok: false }`; a timeout returns "The server took too long to answer. Try again."
-  - `useOnVisible` calls back when the element becomes visible with the given margin, does not watch while disabled, always calls the latest callback without re-observing, stops watching on unmount, and does nothing where `IntersectionObserver` is missing.
+  - `useInfiniteScroll` loads the next page when the trigger nears the viewport (600 px), does not watch while a page loads, after a failure or on the last page, calls the latest query without re-observing, stops watching on unmount, and does nothing where `IntersectionObserver` is missing.
+  - Typing sends one search after a pause, and clearing goes back to the unfiltered feed.
   - The first page shows after the skeleton; Load more continues until the end message, which takes focus.
   - A failed first load shows the error, and Try again recovers.
   - A failed later page keeps the loaded posts and offers Try again.
@@ -338,7 +339,7 @@ Each unit is one commit, in this order. A unit brings in the dependencies, shadc
   - Dependencies: `react-hook-form` and `@hookform/resolvers` in `apps/web`, and `react-hook-form` and `sonner` in `packages/ui`.
   - shadcn components: `alert-dialog`, `badge`, `dialog`, `drawer`, `textarea` (for `TextareaField`), `sonner` (neutral toasts, colored icons, with the `--success` tokens in `globals.css`), and the `Toaster` in `providers.tsx`.
   - `packages/ui/src/components/fields/textarea-field.tsx` and `rhf/` (`Form`, `RhfInput`, `RhfTextarea`, field props).
-  - `components/responsive-dialog.tsx`, `components/discard-changes-dialog.tsx`, `hooks/use-media-query.ts` (KTD12), `apiPost` in `lib/jsonplaceholder.ts`.
+  - `components/responsive-dialog.tsx`, `components/discard-changes-dialog.tsx`, `hooks/use-media-query.ts` (KTD12), `apiPost` in `lib/jsonplaceholder.ts`, and `postsKeys.all` in `queries.ts` (the key the mutation invalidates; `feed` is built from it).
 - **Files:** `apps/web/features/posts/post-store.ts`, `schemas.ts` (create schema and result), `server-actions.ts` (`createPost`; `getUserPosts` serves stored posts first), `hooks/use-create-post.ts`, `hooks/use-posts-feed.ts` (pending rows, New ids), `components/new-post-button.tsx`, `create-post-form-container.tsx`, `create-post-form.tsx`, `posts-feed.tsx` (badges), `user-posts.tsx` (button in the heading row), `apps/web/tests/create-post-form.test.tsx`, `posts-server-actions.test.ts` (store and create cases), plus the files listed under Brings in.
 - **Approach:**
   1. The create schema trims title and body and requires both ("Title is required", "Body is required"), with caps of 120 and 2000 characters. The same schema runs in the resolver and in the action.
