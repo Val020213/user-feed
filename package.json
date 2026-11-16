@@ -9,7 +9,8 @@
     "format": "turbo format",
     "typecheck": "turbo typecheck",
     "prepare": "husky",
-    "commit": "cz"
+    "commit": "cz",
+    "test": "turbo test"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",

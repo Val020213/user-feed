@@ -11,6 +11,7 @@
   "devDependencies": {
     "@eslint/js": "^10",
     "@shadcn/lint": "^0.2.5",
+    "@typescript-eslint/eslint-plugin": "^8.72.2",
     "@typescript-eslint/parser": "^8.72.2",
     "eslint": "^10",
     "eslint-config-next": "16.4.5",

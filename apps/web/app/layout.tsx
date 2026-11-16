@@ -1,9 +1,11 @@
+import type { Metadata } from "next"
 import { Geist_Mono, Inter } from "next/font/google"
 
 import "@workspace/ui/globals.css"
 
 import { cn } from "@workspace/ui/lib/utils"
 
+import { Providers } from "@/app/providers"
 import { ThemeProvider } from "@/components/theme-provider"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
@@ -12,6 +14,11 @@ const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
+
+export const metadata: Metadata = {
+  title: "User Feed",
+  description: "Browse JSONPlaceholder users and their posts.",
+}
 
 export default function RootLayout({
   children,
@@ -30,7 +37,9 @@ export default function RootLayout({
       )}
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <Providers>{children}</Providers>
+        </ThemeProvider>
       </body>
     </html>
   )
